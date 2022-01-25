@@ -3,6 +3,13 @@ import numpy as np
 import click
 import os
 
+def easeInExpo(x: np.ndarray):
+    ret = np.full_like(x, 2)
+    ret = np.power(ret, 10 * x - 10)
+    mask = x == 0
+    ret[mask] = 0
+    return ret
+
 @click.command()
 @click.option(
     '-i',
@@ -18,9 +25,18 @@ import os
     required=True,
     help='Path of resulting image. Must end in .png. Necessary folder created automatically.',
 )
+@click.option(
+    '-e',
+    '--exposure',
+    type=float,
+    help='Increase or decrease exposure. 1.0 is no change.',
+    default=1.0,
+    show_default=True
+)
 def long_exposure(
     input_path,
     output_path,
+    exposure,
 ):
 
     if output_path.split('.')[-1] != 'png':
@@ -44,12 +60,18 @@ def long_exposure(
         if i.shape != shape:
             print(f'WARNING: {i.shape} does not equal first image shape. Skipping')
         else:
-            out_image += i
+            img = i.astype(np.float32) / 255.0
+            if exposure > 1.0:
+                img *= 1 + (exposure / 10)
+            img = easeInExpo(img)
+            out_image += img
 
-    out_image /= len(images) / 15
+    out_image /= len(images)
+    out_image *= exposure
+    out_image *= 255
     out_image = np.clip(out_image, 0, 255)
     out_image = out_image.astype(np.uint8)
-        
+
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, out_image, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
